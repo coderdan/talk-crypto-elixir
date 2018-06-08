@@ -7,7 +7,7 @@
 		<title>reveal.js</title>
 
 		<link rel="stylesheet" href="css/reveal.css">
-		<link rel="stylesheet" href="css/theme/black.css">
+		<link rel="stylesheet" href="css/theme/solarized.css">
 
 		<!-- Theme used for syntax highlighting of code -->
 		<link rel="stylesheet" href="lib/css/zenburn.css">
@@ -24,8 +24,381 @@
 	<body>
 		<div class="reveal">
 			<div class="slides">
-				<section>Slide 1</section>
-				<section>Slide 2</section>
+                <section>
+                  <h1>Sha! I'm trying to Crypto!</h1>
+                </section>
+
+				<section>
+                  <h2>Low level functions</h2>
+                </section>
+
+                <section>
+                  <h3>Binaries and Bitstrings</h3>
+                  <p>A sequence of bytes</p>
+                  <pre>
+                    <code data-trim class="lang-elixir">
+ <<98, 97, 101, 0>> # I'm a binary
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <p>Strings are really just binaries who's bytes happen to be readable</p>
+                  <pre>
+                    <code data-trim class="lang-elixir">
+  "fam" # I'm also a binary
+  "fam" <> <<0>> # => <<102, 97, 109, 0>>
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <p>Binaries are bitlists of size 8 (i.e. organised as bytes)</p>
+                  <pre>
+                    <code data-trim class="lang-elixir">
+                    # We can also define a nibble (i.e. 4-bits)
+                    <<0::size(4)>>
+
+                    # Which is the same as
+                    <<0::size(4)-unit(1)>>
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <p>Let's say we wanted a 128bit block initialised to 0</p>
+                  <pre>
+                    <code data-trim class="lang-elixir">
+                    # We could do
+                    <<0::size(128)>>
+
+                    # or
+                    <<0::size(16)-unit(8)>>
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <p>We can pattern match bitstrings</p>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                    bytes = <<55, 49, 129, 30, 171, 245, 114, 171>>
+
+                    # Match the first byte of a bitstring
+                    <&lt;x::size(1)-unit(8), _rest::size(7)-unit(8)>> = bytes
+                    x # => 55
+
+                    # Or for any length (multiple 8bits)
+                    <&lt;x::size(1)-unit(8), _rest::<mark>binary</mark>>> = bytes
+                    x # => 55
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <p>To extract a "sub" bitstring (binary)</p>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                    bytes = <<55, 49, 129, 30, 171, 245, 114, 171>>
+
+                    # Extract the first 4 bytes
+                    <&lt;x::binary-4, _rest::binary>> = bytes
+                    x # => <<55, 49, 129, 30>>
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <h3>Encoding bitstreams</h3>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                      Base.encode16(bytes)
+                      # => "3731811EABF572AB"
+
+                      Base.encode32(bytes)
+                      # => "G4YYCHVL6VZKW==="
+
+                      Base.encode64(bytes)
+                      # => "NzGBHqv1cqs="
+
+                      # And decode
+                      Base.decode16("3731811EABF572AB")
+                      # => {:ok, <<55, 49, 129, 30, 171, 245, 114, 171>>}
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <p>...a little gotcha!</p>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                      Base.decode16("3731811eabf572ab")
+                      # => :error
+
+                      Base.decode16("3731811eabf572ab", <mark>case: :lower</mark>)
+                      # => {:ok, <<55, 49, 129, 30, 171, 245, 114, 171>>}
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <h2>Crypto in Elixir</h2>
+                </section>
+
+                <section>
+                  <h2>Crypto in <strong>Erlang</strong></h2>
+                  <p class="fragment">Actually, it's really OpenSSL under the hood</p>
+                </section>
+
+                <section>
+                  <h3>PRG - (Secure) Pseudo Random Generator</h3>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                    :crypto.strong_rand_bytes(5)
+                    <<227, 46, 0, 10, 121>>
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <h3>Achtung!</h3>
+                  <p>Never use <code class="lang-elixir">:rand</code> or <code class="lang-elixir">Enum.random</code> for cryptographic functions</p>
+                </section>
+
+                <section>
+                  <h3>Exor on binaries</h3>
+                  <p>Use <code>:crypto.exor/2</code></p>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                    # So I could do a One-time Pad
+                    k = :crypto.strong_rand_bytes(32)
+                    m = "...ain't nobody got time for dat"
+
+                    byte_size(m) # => 32
+
+                    :crypto.exor(k, m) |> Base.encode16
+                    "FF5D282ED7D47FB6117578EE3A5710E..."
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <h3>Hash functions</h3>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                    :crypto.hash(:sha256, "fam")
+                    <<28, 35, 161, 76, 73, 241, 59, 21, 73, 183, 8...>>
+
+                    # You'd probably do
+                    :crypto.hash(:sha256, "fam") |> Base.encode16
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <h2>Message Authentication</h2>
+                </section>
+
+                <section>
+                  <img src="images/HMAC1.png"/>
+                </section>
+
+                <section>
+                  <img src="images/HMAC2.png"/>
+                </section>
+
+                <section>
+                  <h3>Message Authentication</h3>
+                  <p>Supports HMAC and CMAC</p>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                    message = "Pay $100"
+
+                    mac =
+                      :sha256
+                      |> :crypto.hmac(k, message)
+                      |> Base.encode16
+
+                    payload = {message, mac}
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                    {message, mac} = payload
+
+                    verify =
+                      :sha256
+                      |> :crypto.hmac(k, message)
+                      |> Base.encode16
+
+                    # Don't actually do this (see next slide)
+                    if mac == verify do
+                      # do a thing
+                    end
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <p>Using <code>==</code> is vulnerable to timing attacks!</p>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                  # Use secure compare instead
+                  Plug.Crypto.secure_compare(mac, verify)
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <h3><code>Plug.Crypto.MessageVerifier</code></h3>
+                  
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                  k = :crypto.strong_rand_bytes(16)
+                  mac = Plug.Crypto.MessageVerifier.sign("yo bae", k)
+
+                  Plug.Crypto.MessageVerifier.verify(mac, k)
+                  {:ok, "yo bae"}
+                    </code>
+                  </pre>
+                  <p class="fragment">Warning! This is *not* encrypting the message</p>
+                </section>
+
+                <section>
+                  <h2>Symmetric Encryption</h2>
+                  <p>For new projects this should be AES <strong>256</strong> in <strong>GCM</strong> mode (That's CTR mode + CMAC = authenticated encryption and you get
+                  hardware acceleration on Intel/AMD)</p>
+                </section>
+
+                <section>
+                  <h3>Encrypting: AES 256 in GCM mode</h3>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                    # Create a shared key
+                    key = :crypto.strong_rand_bytes(32) # 256 bit key
+
+                    # Generate a random initial value (every time!)
+                    iv = :crypto.strong_rand_bytes(32)
+
+                    {ct, tag} =
+                      :crypto.block_encrypt(
+                        :aes_gcm,
+                        key, iv, {"AES256GCM", msg})
+
+                    payload = Base.encode16(iv <> tag <> ct)
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <h3>Associated Data</h3>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                    {ct, tag} =
+                      :crypto.block_encrypt(
+                        :aes_gcm,
+                        key, iv, {<mark>"AES256GCM"</mark>, msg})
+                    </code>
+                  </pre>
+                  <p>Can be anything you like so long as it's the same for both sides</p>
+                </section>
+
+                <section>
+                  <h3>...Decrypting</h3>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                      <&lt;iv::binary-32, tag::binary-16, ct::binary>> =
+                        Base.decode16!(payload)
+
+                      :crypto.block_decrypt(
+                        :aes_gcm,
+                        @key, iv, {"AES256GCM", ct, tag})
+                    </code>
+                  </pre>
+                </section>
+
+
+                <section>
+                  <h3>Other things to look at</h3>
+
+                  <ul>
+                    <li>Key expansion with PKCS5 (PBKDF2) in <code>Crypto.Plug.KeyGenerator</code></li>
+                    <li>Public key cryptography using <code>:crypto</code></li>
+                    <li>Cloak hex package which uses <code>:crypto</code> internally but only supports AES128 right now</li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h2>Parting thoughts</h2>
+                </section>
+
+                <section>
+                  <p>Who remembers when we hashed passwords with MD5?</p>
+                </section>
+
+                <section>
+                  <p><code>SHA256</code> >> <code>MD5</code></p>
+                  <p class="fragment">...but is it safe to hash passwords?</p>
+                </section>
+
+                <section>
+                  <pre>
+                    <code data-trim data-noescape>
+                  time mix run -e \
+                    "Brute.crack(:crypto.hash(:sha256, \"secret\"))"
+
+                    real	1m13.048s
+                    </code>
+                  </pre>
+                  <p class="fragment">Note that "salting" does not prevent these kinds of attacks</p>
+                </section>
+
+                <section>
+                  We can take at least 3 things from this:
+
+                  <ul>
+                    <li>Use (enforce!) long passwords</li>
+                    <li>Use special chars (or use passphrases)</li>
+                    <li><code>SHA256 (single pass)</code> is too fast for password hashing</li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h3>Option 1: Multipass hashes</h3>
+                  <pre>
+                    <code data-trim data-noescape class="lang-elixir">
+                      Enum.reduce(1..10000, "secret", fn _i, hash ->
+                        :crypto.hash(:sha256, hash)
+                      end)
+                    </code>
+                  </pre>
+                </section>
+
+                <section>
+                  <h3>Option 2: Use comeonin</h3>
+                  <p>
+                    Hex package. Supports:
+
+                    <ul>
+                      <li>Bcrypt</li>
+                      <li>Argon2</li>
+                      <li>Pbkdf2</li>
+                    </ul>
+                  </p>
+                </section>
+
+                <section>
+                  <h1><code>end</code></h1>
+                  <p>
+                    <ul>
+                      <li>t: @danieldraper</li>
+                      <li>e: dan@expert360.com</li>
+                    </ul>
+                  </p>
+                </section>
 			</div>
 		</div>
 
